@@ -5,13 +5,10 @@
 """
 
 import importlib
-import inspect
 import json
-import os
-import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Callable, Optional
+from typing import Dict, List, Any, Optional
 import hashlib
 import logging
 
@@ -290,7 +287,6 @@ class PatchManager:
         """获取补丁状态"""
         applied = []
         pending = []
-        failed = []
         
         for patch in self.patches.values():
             status = {
@@ -357,6 +353,33 @@ def patched_function(*args, **kwargs):
     return result
 '''
         return template
+    
+    def create_patch_from_template(self, template_data: Dict[str, Any]) -> Optional[Patch]:
+        """从模板数据创建补丁"""
+        try:
+            # 生成补丁文件
+            patch_file = self.patch_dir / f"{template_data['id']}.py"
+            
+            with open(patch_file, 'w', encoding='utf-8') as f:
+                template = self.generate_patch_template(
+                    patch_id=template_data['id'],
+                    description=template_data['description'],
+                    target_module=template_data['target_module'],
+                    target_function=template_data['target_function']
+                )
+                f.write(template)
+            
+            # 加载并验证
+            patch = self.load_patch_file(str(patch_file))
+            if patch:
+                self.patches[patch.id] = patch
+                self._save_registry()
+                return patch
+            
+        except Exception as e:
+            self.logger.error(f"创建补丁失败: {e}")
+        
+        return None
 
 # 使用示例
 if __name__ == "__main__":
@@ -380,7 +403,7 @@ if __name__ == "__main__":
     
     # 查看补丁状态
     status = pm.get_patch_status()
-    print(json.dumps(status, indent=2))
+    print(json.dumps(status, indent=2, ensure_ascii=False))
     
     # 应用所有补丁
     # results = pm.apply_all_patches()
